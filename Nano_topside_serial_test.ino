@@ -43,17 +43,21 @@ void setup() {
 void loop() {
   int joyLVal = analogRead(joyLeft);
   int joyRVal = analogRead(joyRight);
+  // Serial.print(joyLVal);
+  // Serial.print("  ");
+  // Serial.println(joyRVal);
 
   char cmdL = 0;
   char cmdR = 0;
 
   // Left joystick
-  if (joyLVal < joyLNeutral - deadzone) cmdL = 'F';
-  else if (joyLVal > joyLNeutral + deadzone) cmdL = 'B';
+  if (joyLVal < joyLNeutral - deadzone) cmdL = 255; //makes motor go ful speed
+  else if (joyLVal > joyLNeutral + deadzone) cmdL = 0; //makes motor stop
+  //Serial.println(cmdL);
 
   // Right joystick
-  if (joyRVal < joyRNeutral - deadzone) cmdR = 'F';
-  else if (joyRVal > joyRNeutral + deadzone) cmdR = 'B';
+  if (joyRVal < joyRNeutral - deadzone) cmdR = 255;
+  else if (joyRVal > joyRNeutral + deadzone) cmdR = 0;
 
   // Only send if at least one joystick is outside deadzone
   if (cmdL != 0 || cmdR != 0) {
@@ -61,8 +65,29 @@ void loop() {
 
     // Use 'L'/'R' as first byte and joystick direction as second
     // If a joystick is neutral, send 0
-    packet[0] = cmdL ? 'L' : '0';
-    packet[1] = cmdR ? 'R' : '0';
+    packet[0] = cmdL ? cmdL : 0;
+    packet[1] = cmdR ? cmdR : 0;
+    packet[2] = crc8(packet, 2);
+
+    digitalWrite(DE, HIGH);
+    digitalWrite(RE, HIGH);
+    RS485Serial.write(packet, 3);
+    //RS485Serial.flush();
+    digitalWrite(DE, LOW);
+    digitalWrite(RE, LOW);
+
+    Serial.print("Sent Left: ");
+    Serial.print(packet[0]);
+    Serial.print(" Right: ");
+    Serial.println(packet[1]);
+  }
+  else{
+    uint8_t packet[3];
+
+    // Use 'L'/'R' as first byte and joystick direction as second
+    // If a joystick is neutral, send 0
+    packet[0] = 0;
+    packet[1] = 0;
     packet[2] = crc8(packet, 2);
 
     digitalWrite(DE, HIGH);
@@ -78,5 +103,5 @@ void loop() {
     Serial.println(packet[1]);
   }
 
-  delay(50);
+  delay(10);
 }
