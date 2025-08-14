@@ -4,10 +4,11 @@
 #define RE 3
 
 SoftwareSerial RS485Serial(10, 11); // TX, RX to Uno
-int joyRight = A0;
-int joyLeft = A1;
-int joyNeutralRight = 512;
-int joyNeutralLeft = 512;
+
+const int joyRight = A0;
+const int joyLeft = A1;
+int joyLNeutral = 512;
+int joyRNeutral = 512;
 const int deadzone = 200;
 
 // CRC8 function
@@ -31,35 +32,38 @@ void setup() {
   digitalWrite(DE, LOW);
   digitalWrite(RE, LOW);
 
-  Serial.begin(2400);      // for debugging
-  RS485Serial.begin(2400); // RS485 TX
-  joyNeutralRight = analogRead(joyRight); // calibrate neutral
-  joyNeutralLeft = analogRead(joyLeft);
+  Serial.begin(2400);
+  RS485Serial.begin(2400);
+
+  delay(1000);
+  joyLNeutral = analogRead(joyLeft);
+  joyRNeutral = analogRead(joyRight);
 }
 
 void loop() {
-  int joyValRight = analogRead(joyRight);
-  int joyValLeft = analogRead(joyLeft);
-  char directionR = 0;
-  char directionL = 0;
-  //assess directionality of right joystick
-  if (joyValRight < joyNeutralRight - deadzone) directionR = 'RF';
-  else if (joyValRight > joyNeutralRight + deadzone) directionR = 'RB';
-  //assess directionality of left joystick
-  if (joyValLeft < joyNeutralLeft - deadzone) directionL = 'LF';
-  else if (joyValLeft > joyNeutralLeft + deadzone) directionL = 'LB';
-  //Serial.println(direction);
+  int joyLVal = analogRead(joyLeft);
+  int joyRVal = analogRead(joyRight);
 
-  if (directionR != 0 || directionL != 0) {
-    Serial.print("Right: ");
-    Serial.print(joyValRight);
-    Serial.print(" , Left:");
-    Serial.println(joyValLeft);
-    
+  char cmdL = 0;
+  char cmdR = 0;
+
+  // Left joystick
+  if (joyLVal < joyLNeutral - deadzone) cmdL = 'F';
+  else if (joyLVal > joyLNeutral + deadzone) cmdL = 'B';
+
+  // Right joystick
+  if (joyRVal < joyRNeutral - deadzone) cmdR = 'F';
+  else if (joyRVal > joyRNeutral + deadzone) cmdR = 'B';
+
+  // Only send if at least one joystick is outside deadzone
+  if (cmdL != 0 || cmdR != 0) {
     uint8_t packet[3];
-    packet[0] = directionR;
-    packet[1] = directionL;
-    packet[2] = crc8(&packet[0], 1);
+
+    // Use 'L'/'R' as first byte and joystick direction as second
+    // If a joystick is neutral, send 0
+    packet[0] = cmdL ? 'L' : '0';
+    packet[1] = cmdR ? 'R' : '0';
+    packet[2] = crc8(packet, 2);
 
     digitalWrite(DE, HIGH);
     digitalWrite(RE, HIGH);
@@ -67,6 +71,11 @@ void loop() {
     RS485Serial.flush();
     digitalWrite(DE, LOW);
     digitalWrite(RE, LOW);
+
+    Serial.print("Sent Left: ");
+    Serial.print(packet[0]);
+    Serial.print(" Right: ");
+    Serial.println(packet[1]);
   }
 
   delay(50);
